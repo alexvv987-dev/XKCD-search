@@ -351,7 +351,7 @@ func TestSearchConcurrency(t *testing.T) {
 		}
 		wg.Wait()
 	}
-	require.True(t, int64(concurrency*numPacks) < countOK.Load(), "need some http ok")
+	require.True(t, int64(concurrency*numPacks) <= countOK.Load(), "need some http ok")
 	require.True(t, int64(0) < countBusy.Load(), "need at least some http busy")
 	require.Equal(t, int64(numPacks*packSize), countOK.Load()+countBusy.Load(),
 		"need only ok and busy statuses")

@@ -19,28 +19,39 @@ type ComicsReply struct {
 	Total  int      `json:"total"`
 }
 
-func TestSearchNoPhrase(t *testing.T) {
+func TestSearch(t *testing.T) {
+	_, err := update()
+	require.NoError(t, err, "could not run update")
+	t.Run("no phrase", SearchNoPhrase)
+	t.Run("bad limit minus", SearchBadLimitMinus)
+	t.Run("bad limit alpha", SearchBadLimitAlpha)
+	t.Run("search limit 2", SearchLimit2)
+	t.Run("search limit default", SearchLimitDefault)
+	t.Run("search phrases", SearchPhrases)
+}
+
+func SearchNoPhrase(t *testing.T) {
 	resp, err := client.Get(address + "/api/search")
 	require.NoError(t, err, "failed to search")
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode, "need bad request")
 }
 
-func TestSearchBadLimitMinus(t *testing.T) {
+func SearchBadLimitMinus(t *testing.T) {
 	resp, err := client.Get(address + "/api/search?limit=-1")
 	require.NoError(t, err, "failed to search")
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode, "need bad request")
 }
 
-func TestSearchBadLimitAlpha(t *testing.T) {
+func SearchBadLimitAlpha(t *testing.T) {
 	resp, err := client.Get(address + "/api/search?limit=asdf")
 	require.NoError(t, err, "failed to search")
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode, "need bad request")
 }
 
-func TestSearchLimit2(t *testing.T) {
+func SearchLimit2(t *testing.T) {
 	resp, err := client.Get(address + "/api/search?limit=2&phrase=linux")
 	require.NoError(t, err, "failed to search")
 	defer resp.Body.Close()
@@ -51,7 +62,7 @@ func TestSearchLimit2(t *testing.T) {
 	require.Equal(t, 2, len(comics.Comics))
 }
 
-func TestSearchLimitDefault(t *testing.T) {
+func SearchLimitDefault(t *testing.T) {
 
 	resp, err := client.Get(address + "/api/search?phrase=linux")
 	require.NoError(t, err, "failed to search")
@@ -63,7 +74,7 @@ func TestSearchLimitDefault(t *testing.T) {
 	require.Equal(t, 10, len(comics.Comics))
 }
 
-func TestSearchPhrases(t *testing.T) {
+func SearchPhrases(t *testing.T) {
 	testCases := []struct {
 		phrase string
 		url    string

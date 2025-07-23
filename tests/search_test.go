@@ -1,136 +1,14 @@
-package words_test
+package api_test
 
 import (
 	"encoding/json"
 	"net/http"
 	"net/url"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
-
-const address = "http://localhost:28080"
-
-var client = http.Client{
-	Timeout: 5 * time.Minute,
-}
-
-func TestPreflight(t *testing.T) {
-	require.Equal(t, true, true)
-}
-
-type PingResponse struct {
-	Replies map[string]string `json:"replies"`
-}
-
-func TestPing(t *testing.T) {
-	resp, err := client.Get(address + "/api/ping")
-	require.NoError(t, err, "cannot ping")
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusOK, resp.StatusCode, "wrong status")
-
-	var reply PingResponse
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(&reply))
-	require.Equal(t, "ok", reply.Replies["words"], "no words running")
-	require.Equal(t, "ok", reply.Replies["update"], "no update running")
-	require.Equal(t, "ok", reply.Replies["search"], "no search running")
-}
-
-type UpdateStats struct {
-	WordsTotal    int `json:"words_total"`
-	WordsUnique   int `json:"words_unique"`
-	ComicsFetched int `json:"comics_fetched"`
-	ComicsTotal   int `json:"comics_total"`
-}
-
-type UpdateStatus struct {
-	Status string `json:"status"`
-}
-
-func prepare(t *testing.T) {
-	req, err := http.NewRequest(http.MethodDelete, address+"/api/db", nil)
-	require.NoError(t, err, "cannot make request")
-	resp, err := client.Do(req)
-	require.NoError(t, err, "could not send clean up command")
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-
-	st := stats(t)
-	require.Equal(t, 0, st.ComicsFetched)
-	require.True(t, st.ComicsTotal > 3000, "there are more than 3000 comics in XKCD")
-	require.Equal(t, 0, st.WordsTotal)
-	require.Equal(t, 0, st.WordsUnique)
-
-	require.Equal(t, "idle", status(t))
-}
-
-func TestEmptyDB(t *testing.T) {
-	prepare(t)
-}
-
-func TestUpdate(t *testing.T) {
-	prepare(t)
-	var wg sync.WaitGroup
-	wg.Add(3)
-	var res1, res2 int
-	var res3 string
-	go func() {
-		res1 = update(t)
-		wg.Done()
-	}()
-	go func() {
-		res2 = update(t)
-		wg.Done()
-	}()
-	go func() {
-		time.Sleep(1 * time.Second)
-		res3 = status(t)
-		wg.Done()
-	}()
-	wg.Wait()
-	require.True(t,
-		res1 == http.StatusOK && res2 == http.StatusAccepted ||
-			res2 == http.StatusOK && res1 == http.StatusAccepted,
-		"wrong statuses from concurrent updates, expect ok && accepted",
-	)
-	require.Equal(t, "running", res3, "need running status while update")
-	st := stats(t)
-	require.Equal(t, st.ComicsTotal, st.ComicsFetched)
-	require.True(t, st.ComicsTotal > 3000, "there are more than 3000 comics in XKCD")
-	require.True(t, 1000 < st.WordsTotal, "not enough total words in DB")
-	require.True(t, 100 < st.WordsUnique, "not enough unique words in DB")
-}
-
-func update(t *testing.T) int {
-	req, err := http.NewRequest(http.MethodPost, address+"/api/db/update", nil)
-	require.NoError(t, err, "cannot make request")
-	resp, err := client.Do(req)
-	require.NoError(t, err, "could not send update command")
-	defer resp.Body.Close()
-	return resp.StatusCode
-}
-
-func status(t *testing.T) string {
-	resp, err := client.Get(address + "/api/db/status")
-	require.NoError(t, err, "could not get status")
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-	var status UpdateStatus
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(&status), "cannot decode")
-	return status.Status
-}
-
-func stats(t *testing.T) UpdateStats {
-	resp, err := client.Get(address + "/api/db/stats")
-	require.NoError(t, err, "could not get stats")
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-	var stats UpdateStats
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(&stats), "cannot decode")
-	return stats
-}
 
 type Comics struct {
 	ID  int    `json:"id"`
@@ -142,44 +20,40 @@ type ComicsReply struct {
 	Total  int      `json:"total"`
 }
 
-func TestSearchNoPhrase(t *testing.T) {
+func TestSearch(t *testing.T) {
+	_, err := update()
+	require.NoError(t, err, "could not run update")
+	t.Run("no phrase", SearchNoPhrase)
+	t.Run("bad limit minus", SearchBadLimitMinus)
+	t.Run("bad limit alpha", SearchBadLimitAlpha)
+	t.Run("search limit 2", SearchLimit2)
+	t.Run("search limit default", SearchLimitDefault)
+	t.Run("search phrases", SearchPhrases)
+	t.Run("index search", IndexSearchPhrases)
+}
+
+func SearchNoPhrase(t *testing.T) {
 	resp, err := client.Get(address + "/api/search")
 	require.NoError(t, err, "failed to search")
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode, "need bad request")
-
-	resp, err = client.Get(address + "/api/isearch")
-	require.NoError(t, err, "failed to search")
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusBadRequest, resp.StatusCode, "need bad request")
 }
 
-func TestSearchBadLimitMinus(t *testing.T) {
+func SearchBadLimitMinus(t *testing.T) {
 	resp, err := client.Get(address + "/api/search?limit=-1")
 	require.NoError(t, err, "failed to search")
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode, "need bad request")
-
-	resp, err = client.Get(address + "/api/isearch?limit=-1")
-	require.NoError(t, err, "failed to search")
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusBadRequest, resp.StatusCode, "need bad request")
 }
 
-func TestSearchBadLimitAlpha(t *testing.T) {
+func SearchBadLimitAlpha(t *testing.T) {
 	resp, err := client.Get(address + "/api/search?limit=asdf")
 	require.NoError(t, err, "failed to search")
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode, "need bad request")
-
-	resp, err = client.Get(address + "/api/isearch?limit=asdf")
-	require.NoError(t, err, "failed to search")
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusBadRequest, resp.StatusCode, "need bad request")
 }
 
-func TestSearchLimit2(t *testing.T) {
-	update(t)
+func SearchLimit2(t *testing.T) {
 	resp, err := client.Get(address + "/api/search?limit=2&phrase=linux")
 	require.NoError(t, err, "failed to search")
 	defer resp.Body.Close()
@@ -190,8 +64,8 @@ func TestSearchLimit2(t *testing.T) {
 	require.Equal(t, 2, len(comics.Comics))
 }
 
-func TestSearchLimitDefault(t *testing.T) {
-	update(t)
+func SearchLimitDefault(t *testing.T) {
+
 	resp, err := client.Get(address + "/api/search?phrase=linux")
 	require.NoError(t, err, "failed to search")
 	defer resp.Body.Close()
@@ -202,8 +76,7 @@ func TestSearchLimitDefault(t *testing.T) {
 	require.Equal(t, 10, len(comics.Comics))
 }
 
-func TestSearchPhrases(t *testing.T) {
-	update(t)
+func SearchPhrases(t *testing.T) {
 	testCases := []struct {
 		phrase string
 		url    string
@@ -247,7 +120,8 @@ func TestSearchPhrases(t *testing.T) {
 	}
 }
 
-func TestIndexSearchPhrasesLongTest(t *testing.T) {
+func IndexSearchPhrases(t *testing.T) {
+	// clean DB and wait 30 sec for index update
 	prepare(t)
 	time.Sleep(30 * time.Second)
 	resp, err := client.Get(address + "/api/isearch?phrase=linux")
@@ -258,7 +132,10 @@ func TestIndexSearchPhrasesLongTest(t *testing.T) {
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&comics), "decode failed")
 	require.Equal(t, 0, comics.Total)
 	require.Equal(t, 0, len(comics.Comics))
-	update(t)
+
+	// update DB and wait 30 sec for index update
+	_, err = update()
+	require.NoError(t, err, "could not run update")
 	time.Sleep(30 * time.Second)
 
 	testCases := []struct {

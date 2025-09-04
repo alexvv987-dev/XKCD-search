@@ -58,7 +58,7 @@ search сервис должен принять фразу пользовате�
 SEARCH_ADDRESS, DB_ADDRESS, WORDS_ADDRESS
 4. API gateway должен находить search через конфиг файл или через переменную окружения -
 SEARCH_ADDRESS
-5. Используется golang 1.24+, slog логгер.
+5. Используется golang 1.25+, slog логгер.
 
 ## Материалы для ознакомления
 

@@ -28,6 +28,9 @@ func (s *server) Ping(_ context.Context, _ *emptypb.Empty) (*emptypb.Empty, erro
 }
 
 func (s *server) Norm(_ context.Context, in *wordspb.WordsRequest) (*wordspb.WordsReply, error) {
+	if len(in.GetPhrase()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "empty phrase")
+	}
 	if len(in.GetPhrase()) > maxPhraseLen {
 		return nil, status.Error(
 			codes.ResourceExhausted,

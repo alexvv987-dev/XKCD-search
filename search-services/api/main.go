@@ -10,8 +10,11 @@ import (
 	"os/signal"
 
 	"yadro.com/course/api/adapters/rest"
+	"yadro.com/course/api/adapters/search"
 	"yadro.com/course/api/adapters/update"
+	"yadro.com/course/api/adapters/words"
 	"yadro.com/course/api/config"
+	"yadro.com/course/api/core"
 )
 
 func main() {
@@ -31,8 +34,24 @@ func main() {
 		log.Error("cannot init update adapter", "error", err)
 		os.Exit(1)
 	}
-
+	wordsClient, err := words.NewClient(cfg.WordsAddress, log)
+	if err != nil {
+		log.Error("cannot init words adapter", "error", err)
+		os.Exit(1)
+	}
+	searchClient, err := search.NewClient(cfg.SearchAddress, log)
+	if err != nil {
+		log.Error("cannot init words adapter", "error", err)
+		os.Exit(1)
+	}
 	mux := http.NewServeMux()
+	pingers := map[string]core.Pinger{
+		"update": updateClient,
+		"words":  wordsClient,
+		"search": searchClient,
+	}
+	mux.Handle("GET /api/ping", rest.NewPingHandler(log, pingers))
+	mux.Handle("GET /api/search", rest.NewSearchHandler(log, searchClient))
 	mux.Handle("POST /api/db/update", rest.NewUpdateHandler(log, updateClient))
 	mux.Handle("GET /api/db/stats", rest.NewUpdateStatsHandler(log, updateClient))
 	mux.Handle("GET /api/db/status", rest.NewUpdateStatusHandler(log, updateClient))

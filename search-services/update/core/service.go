@@ -2,7 +2,11 @@ package core
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
+	"sync"
+	"sync/atomic"
 )
 
 type Service struct {
@@ -11,26 +15,114 @@ type Service struct {
 	xkcd        XKCD
 	words       Words
 	concurrency int
+	running     atomic.Bool
+	notFound    atomic.Int64
 }
 
 func NewService(
 	log *slog.Logger, db DB, xkcd XKCD, words Words, concurrency int,
 ) (*Service, error) {
-	return nil, nil
+	if concurrency < 1 {
+		return nil, fmt.Errorf("wrong concurrency specified: %d", concurrency)
+	}
+	return &Service{
+		log:         log,
+		db:          db,
+		xkcd:        xkcd,
+		words:       words,
+		concurrency: concurrency,
+	}, nil
 }
 
 func (s *Service) Update(ctx context.Context) (err error) {
+	if s.running.Swap(true) {
+		return ErrAlreadyExists
+	}
+	defer s.running.Store(false)
+	comicsNum, err := s.xkcd.LastID(ctx)
+	if err != nil {
+		s.log.Error("failed to fetch comic number", "err", err)
+		return err
+	}
+	currDbIds, err := s.db.IDs(ctx)
+	if err != nil {
+		s.log.Error("error getting database ids", "error", err)
+		return err
+	}
+	dbIds := map[int]struct{}{}
+	for _, num := range currDbIds {
+		dbIds[num] = struct{}{}
+	}
+	ids := make(chan int)
+	go func() {
+		defer close(ids)
+		for id := 1; id <= comicsNum; id++ {
+			if _, ok := dbIds[id]; !ok {
+				ids <- id
+			}
+		}
+	}()
+	wg := sync.WaitGroup{}
+	s.notFound.Store(0)
+	for i := 0; i < s.concurrency; i++ {
+		wg.Go(func() {
+			for id := range ids {
+				comics, err := s.xkcd.Get(ctx, id)
+				if err != nil {
+					if errors.Is(err, ErrNotFound) {
+						s.notFound.Add(1)
+						continue
+					}
+					s.log.Error("get comics", "id", id, "err", err)
+					continue
+				}
+				normalizedDescription, err := s.words.Norm(ctx, comics.Title+" "+comics.SafeTitle+" "+comics.Description+" "+comics.Transcript)
+				if err != nil {
+					s.log.Error("norm", "id", id, "err", err)
+					continue
+				}
+				err = s.db.Add(ctx, Comics{ID: id, URL: comics.URL, Words: normalizedDescription})
+				if err != nil {
+					s.log.Error("add comics", "id", id, "err", err)
+					continue
+				}
+			}
+		})
+	}
+	wg.Wait()
 	return nil
 }
 
 func (s *Service) Stats(ctx context.Context) (ServiceStats, error) {
-	return ServiceStats{}, nil
+	stats, err := s.db.Stats(ctx)
+	if err != nil {
+		s.log.Error("error getting stats", "err", err)
+		return ServiceStats{}, err
+	}
+	comicsTotal, err := s.xkcd.LastID(ctx)
+	if err != nil {
+		s.log.Error("error getting comics total", "err", err)
+		return ServiceStats{}, err
+	}
+	return ServiceStats{
+		DBStats:     stats,
+		ComicsTotal: comicsTotal - int(s.notFound.Load()),
+	}, nil
 }
 
 func (s *Service) Status(ctx context.Context) ServiceStatus {
+	if s.running.Load() {
+		return StatusRunning
+	}
 	return StatusIdle
 }
 
 func (s *Service) Drop(ctx context.Context) error {
+	err := s.db.Drop(ctx)
+	if err != nil {
+		s.log.Error("error dropping database", "err", err)
+		return err
+	}
+	s.log.Info("dropped")
 	return nil
 }

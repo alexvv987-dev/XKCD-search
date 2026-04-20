@@ -191,10 +191,11 @@ const file_proto_search_search_proto_rawDesc = "" +
 	"\x03url\x18\x02 \x01(\tR\x03url\"J\n" +
 	"\vSearchReply\x12%\n" +
 	"\x06comics\x18\x01 \x03(\v2\r.search.ComicR\x06comics\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x03R\x05total2z\n" +
+	"\x05total\x18\x02 \x01(\x03R\x05total2\xb7\x01\n" +
 	"\x06Search\x128\n" +
 	"\x04Ping\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\"\x00\x126\n" +
-	"\x06Search\x12\x15.search.SearchRequest\x1a\x13.search.SearchReply\"\x00B\x1fZ\x1dyadro.com/course/proto/searchb\x06proto3"
+	"\x06Search\x12\x15.search.SearchRequest\x1a\x13.search.SearchReply\"\x00\x12;\n" +
+	"\vSearchIndex\x12\x15.search.SearchRequest\x1a\x13.search.SearchReply\"\x00B\x1fZ\x1dyadro.com/course/proto/searchb\x06proto3"
 
 var (
 	file_proto_search_search_proto_rawDescOnce sync.Once
@@ -219,10 +220,12 @@ var file_proto_search_search_proto_depIdxs = []int32{
 	1, // 0: search.SearchReply.comics:type_name -> search.Comic
 	3, // 1: search.Search.Ping:input_type -> google.protobuf.Empty
 	0, // 2: search.Search.Search:input_type -> search.SearchRequest
-	3, // 3: search.Search.Ping:output_type -> google.protobuf.Empty
-	2, // 4: search.Search.Search:output_type -> search.SearchReply
-	3, // [3:5] is the sub-list for method output_type
-	1, // [1:3] is the sub-list for method input_type
+	0, // 3: search.Search.SearchIndex:input_type -> search.SearchRequest
+	3, // 4: search.Search.Ping:output_type -> google.protobuf.Empty
+	2, // 5: search.Search.Search:output_type -> search.SearchReply
+	2, // 6: search.Search.SearchIndex:output_type -> search.SearchReply
+	4, // [4:7] is the sub-list for method output_type
+	1, // [1:4] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
 	1, // [1:1] is the sub-list for extension extendee
 	0, // [0:1] is the sub-list for field type_name

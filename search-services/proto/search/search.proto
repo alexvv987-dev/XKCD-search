@@ -24,4 +24,5 @@ message SearchReply {
 service Search {
   rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty) {}
   rpc Search(SearchRequest) returns (SearchReply) {}
+  rpc SearchIndex(SearchRequest) returns (SearchReply) {}
 }

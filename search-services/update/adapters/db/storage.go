@@ -28,7 +28,8 @@ const (
 	`
 	queryDrop = `
 	TRUNCATE TABLE comics
-`
+	`
+	pgErrUniqueViolation = "23505"
 )
 
 type DB struct {
@@ -53,7 +54,7 @@ func (db *DB) Add(ctx context.Context, comics core.Comics) error {
 	_, err := db.conn.ExecContext(ctx, queryAdd, comics.ID, comics.URL, pq.Array(comics.Words))
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if errors.As(err, &pgErr) && pgErr.Code == pgErrUniqueViolation {
 			return core.ErrAlreadyExists
 		}
 		db.log.Error("insert", "error", err)

@@ -63,3 +63,28 @@ func (s *Server) Search(ctx context.Context, in *searchpb.SearchRequest) (*searc
 		Total:  int64(len(pbComics)),
 	}, nil
 }
+
+func (s *Server) SearchIndex(ctx context.Context, in *searchpb.SearchRequest) (*searchpb.SearchReply, error) {
+	if len(in.GetPhrase()) == 0 {
+		return nil, toGRPCError(core.ErrBadArguments)
+	}
+	limit := in.GetLimit()
+	if limit <= 0 || limit > maxLimit {
+		return nil, toGRPCError(core.ErrBadArguments)
+	}
+	comics, err := s.service.SearchIndex(ctx, in.GetPhrase(), int(in.GetLimit()))
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	pbComics := make([]*searchpb.Comic, 0, len(comics))
+	for _, comic := range comics {
+		pbComics = append(pbComics, &searchpb.Comic{
+			Id:  int64(comic.ID),
+			Url: comic.URL,
+		})
+	}
+	return &searchpb.SearchReply{
+		Comics: pbComics,
+		Total:  int64(len(pbComics)),
+	}, nil
+}

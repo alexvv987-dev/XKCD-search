@@ -13,6 +13,8 @@ type Service struct {
 	db          DB
 	words       Words
 	concurrency int
+	index       map[string][]int
+	mu          sync.RWMutex
 }
 
 type searchResult struct {
@@ -32,6 +34,65 @@ func NewService(
 		words:       words,
 		concurrency: concurrency,
 	}, nil
+}
+
+func (s *Service) Index(ctx context.Context) error {
+	comics, err := s.db.Get(ctx)
+	if err != nil {
+		s.log.Error("Failed to get comics", "err", err)
+		return err
+	}
+	newIndex := make(map[string][]int)
+	for _, comic := range comics {
+		for _, word := range comic.Words {
+			newIndex[word] = append(newIndex[word], comic.ID)
+		}
+	}
+	s.mu.Lock()
+	s.index = newIndex
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *Service) SearchIndex(ctx context.Context, query string, limit int) ([]Comics, error) {
+	words, err := s.words.Norm(ctx, query)
+	if err != nil {
+		s.log.Error("Failed to norm words", "query", query, "err", err)
+		return nil, err
+	}
+	scores := make(map[int]int)
+	for _, word := range words {
+		s.mu.RLock()
+		ids := s.index[word]
+		s.mu.RUnlock()
+		for _, id := range ids {
+			scores[id]++
+		}
+	}
+	ranked := make([]int, 0, len(scores))
+	for id := range scores {
+		ranked = append(ranked, id)
+	}
+	sort.Slice(ranked, func(i, j int) bool {
+		return scores[ranked[i]] > scores[ranked[j]]
+	})
+	if len(ranked) > limit {
+		ranked = ranked[:limit]
+	}
+	comics, err := s.db.GetByIDs(ctx, ranked)
+	if err != nil {
+		s.log.Error("Failed to get comics", "err", err)
+		return nil, err
+	}
+	sortedByIDs := make(map[int]Comics, len(comics))
+	for _, comic := range comics {
+		sortedByIDs[comic.ID] = comic
+	}
+	result := make([]Comics, 0, len(ranked))
+	for _, id := range ranked {
+		result = append(result, sortedByIDs[id])
+	}
+	return result, nil
 }
 
 func (s *Service) Search(ctx context.Context, query string, limit int) ([]Comics, error) {

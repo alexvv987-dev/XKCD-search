@@ -77,19 +77,17 @@ func NewPingHandler(log *slog.Logger, pingers map[string]core.Pinger) http.Handl
 	}
 }
 
-func NewSearchHandler(log *slog.Logger, searcher core.Searcher) http.HandlerFunc {
+func NewSearchIndexHandler(log *slog.Logger, searcher core.Searcher) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
-		var limit int
 		var err error
-		if params.Get("phrase") == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		if !params.Has("limit") {
+		var limit int
+		params := r.URL.Query()
+		phrase := params.Get("phrase")
+		queryLimit := params.Get("limit")
+		if queryLimit == "" {
 			limit = defaultLimit
 		} else {
-			limit, err = strconv.Atoi(params.Get("limit"))
+			limit, err = strconv.Atoi(queryLimit)
 			if err != nil {
 				log.Error("Failed to parse query parameter 'limit'", "error", err)
 				w.WriteHeader(http.StatusBadRequest)
@@ -101,7 +99,58 @@ func NewSearchHandler(log *slog.Logger, searcher core.Searcher) http.HandlerFunc
 				return
 			}
 		}
-		searched, err := searcher.Search(r.Context(), params.Get("phrase"), limit)
+		if phrase == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		searched, err := searcher.SearchIndex(r.Context(), phrase, limit)
+		if err != nil {
+			log.Error("Failed to search", "error", err)
+			w.WriteHeader(toHTTPStatus(err))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		comics := make([]Comic, 0, len(searched))
+		for _, data := range searched {
+			comics = append(comics, Comic{ID: data.ID, URL: data.URL})
+		}
+		err = json.NewEncoder(w).Encode(SearchResponse{
+			Comics: comics,
+			Total:  len(searched),
+		})
+		if err != nil {
+			log.Error("Failed to encode response", "error", err)
+		}
+	}
+}
+
+func NewSearchHandler(log *slog.Logger, searcher core.Searcher) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var err error
+		var limit int
+		params := r.URL.Query()
+		phrase := params.Get("phrase")
+		queryLimit := params.Get("limit")
+		if queryLimit == "" {
+			limit = defaultLimit
+		} else {
+			limit, err = strconv.Atoi(queryLimit)
+			if err != nil {
+				log.Error("Failed to parse query parameter 'limit'", "error", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			if limit <= 0 {
+				log.Error("Invalid query parameter 'limit'", "error", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+		}
+		if phrase == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		searched, err := searcher.Search(r.Context(), phrase, limit)
 		if err != nil {
 			log.Error("Failed to search", "error", err)
 			w.WriteHeader(toHTTPStatus(err))

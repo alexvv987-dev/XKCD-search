@@ -41,7 +41,7 @@ func main() {
 	}
 	searchClient, err := search.NewClient(cfg.SearchAddress, log)
 	if err != nil {
-		log.Error("cannot init words adapter", "error", err)
+		log.Error("cannot init search adapter", "error", err)
 		os.Exit(1)
 	}
 	mux := http.NewServeMux()
@@ -52,6 +52,7 @@ func main() {
 	}
 	mux.Handle("GET /api/ping", rest.NewPingHandler(log, pingers))
 	mux.Handle("GET /api/search", rest.NewSearchHandler(log, searchClient))
+	mux.Handle("GET /api/isearch", rest.NewSearchIndexHandler(log, searchClient))
 	mux.Handle("POST /api/db/update", rest.NewUpdateHandler(log, updateClient))
 	mux.Handle("GET /api/db/stats", rest.NewUpdateStatsHandler(log, updateClient))
 	mux.Handle("GET /api/db/status", rest.NewUpdateStatusHandler(log, updateClient))

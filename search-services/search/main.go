@@ -14,6 +14,7 @@ import (
 	searchpb "yadro.com/course/proto/search"
 	"yadro.com/course/search/adapters/db"
 	searchgrpc "yadro.com/course/search/adapters/grpc"
+	"yadro.com/course/search/adapters/initiator"
 	"yadro.com/course/search/adapters/words"
 	"yadro.com/course/search/config"
 	"yadro.com/course/search/core"
@@ -53,6 +54,11 @@ func run(cfg config.Config, log *slog.Logger) error {
 		return fmt.Errorf("failed create search service: %v", err)
 	}
 
+	initiator, err := initiator.NewInitiator(log, searcher, cfg.IndexTTL)
+	if err != nil {
+		return fmt.Errorf("failed create initiator: %v", err)
+	}
+
 	listener, err := net.Listen("tcp", cfg.Address)
 	if err != nil {
 		return fmt.Errorf("failed to listen: %v", err)
@@ -64,6 +70,8 @@ func run(cfg config.Config, log *slog.Logger) error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+
+	go initiator.Start(ctx)
 
 	go func() {
 		<-ctx.Done()

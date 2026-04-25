@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 	wordspb "yadro.com/course/proto/words"
-	"yadro.com/course/update/core"
+	"yadro.com/course/search/core"
 )
 
 type Client struct {

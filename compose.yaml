@@ -63,6 +63,30 @@ services:
       words:
         condition: service_started
 
+  search:
+    image: search:latest
+    build:
+      context: search-services
+      dockerfile: Dockerfile.search
+    container_name: search
+    restart: unless-stopped
+    ports:
+      - 28083:8080
+    volumes:
+      - ./search-services/search/config.yaml:/config.yaml
+    environment:
+    - SEARCH_ADDRESS=:8080
+    - SEARCH_LIMIT=10
+    - DB_ADDRESS=postgres://postgres:password@postgres:5432/postgres
+    - WORDS_ADDRESS=words:8080
+    - INDEX_TTL=20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      words:
+        condition: service_started
+
+
   tests:
     image: tests:latest
     build: tests
@@ -81,7 +105,7 @@ services:
     volumes:
       - postgres:/var/lib/postgresql
     healthcheck:
-      test: [ "CMD", "pg_isready" ]
+      test: ["CMD", "pg_isready"]
       interval: 10s
       retries: 5
       start_period: 30s

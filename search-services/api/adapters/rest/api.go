@@ -3,10 +3,12 @@ package rest
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
 
+	"github.com/VictoriaMetrics/metrics"
 	"yadro.com/course/api/core"
 )
 
@@ -40,6 +42,15 @@ type SearchResponse struct {
 	Total  int     `json:"total"`
 }
 
+type Authenticator interface {
+	Login(user, password string) (string, error)
+}
+
+type LoginRequest struct {
+	Name     string `json:"name"`
+	Password string `json:"password"`
+}
+
 const (
 	defaultLimit = 10
 )
@@ -52,8 +63,37 @@ func toHTTPStatus(err error) int {
 		return http.StatusNotFound
 	case errors.Is(err, core.ErrAlreadyExists):
 		return http.StatusAccepted
+	case errors.Is(err, core.ErrUnauthorized), errors.Is(err, core.ErrInvalidToken):
+		return http.StatusUnauthorized
 	default:
 		return http.StatusInternalServerError
+	}
+}
+
+func NewMetricsHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		metrics.WritePrometheus(w, true)
+	}
+}
+
+func NewLoginHandler(log *slog.Logger, auth Authenticator) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		req := LoginRequest{}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		tokenString, err := auth.Login(req.Name, req.Password)
+		if err != nil {
+			log.Warn("Authentication failed", "error", err)
+			w.WriteHeader(toHTTPStatus(err))
+			return
+		}
+		log.Info("Authentication succeeded", "name", req.Name)
+		if _, err = fmt.Fprint(w, tokenString); err != nil {
+			log.Error("Failed to write response", "error", err)
+		}
+
 	}
 }
 

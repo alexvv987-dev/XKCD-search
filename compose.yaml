@@ -63,6 +63,29 @@ services:
         condition: service_healthy
       words:
         condition: service_started
+
+  search:
+    image: search:latest
+    build:
+      context: search-services
+      dockerfile: Dockerfile.search
+    container_name: search
+    restart: unless-stopped
+    ports:
+      - 28083:8080
+    volumes:
+      - ./search-services/search/config.yaml:/config.yaml
+    environment:
+    - SEARCH_ADDRESS=:8080
+    - SEARCH_LIMIT=10
+    - DB_ADDRESS=postgres://postgres:password@postgres:5432/postgres
+    - WORDS_ADDRESS=words:8080
+    - INDEX_TTL=20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      words:
+        condition: service_started
       nats:
         condition: service_started
 
@@ -84,7 +107,7 @@ services:
     volumes:
       - postgres:/var/lib/postgresql
     healthcheck:
-      test: [ "CMD", "pg_isready" ]
+      test: ["CMD", "pg_isready"]
       interval: 10s
       retries: 5
       start_period: 30s
@@ -111,6 +134,33 @@ services:
     ports:
       - "4222:4222"
 
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.125.0
+    container_name: victoriametrics
+    ports:
+      - 8428:8428
+    volumes:
+      - vmdata:/storage
+      - ./metrics/promscrape.yml:/etc/promscrape.yml
+    command:
+      - "--storageDataPath=/storage"
+      - "--httpListenAddr=:8428"
+      - "--promscrape.config=/etc/promscrape.yml"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.2.0
+    container_name: grafana
+    depends_on:
+      - "victoriametrics"
+    ports:
+      - 3000:3000
+    volumes:
+      - grafanadata:/var/lib/grafana
+    restart: unless-stopped
+
 volumes:
   postgres:
   pgadmin:
+  vmdata:
+  grafanadata:

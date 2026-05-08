@@ -24,5 +24,10 @@ type XKCD interface {
 }
 
 type Words interface {
-	Norm(ctx context.Context, phrase string) ([]string, error)
+	Norm(context.Context, string) ([]string, error)
+}
+
+type Publisher interface {
+	Publish(context.Context) error
+	PublishDrop(context.Context) error
 }

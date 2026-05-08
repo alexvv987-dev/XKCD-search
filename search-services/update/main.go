@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	updatepb "yadro.com/course/proto/update"
+	"yadro.com/course/update/adapters/broker"
 	"yadro.com/course/update/adapters/db"
 	updategrpc "yadro.com/course/update/adapters/grpc"
 	"yadro.com/course/update/adapters/words"
@@ -62,8 +63,13 @@ func run(cfg config.Config, log *slog.Logger) error {
 		return fmt.Errorf("failed create Words client: %v", err)
 	}
 
+	publisher, err := broker.NewPublisher(log, cfg.BrokerAddress)
+	if err != nil {
+		return fmt.Errorf("failed create publisher: %v", err)
+	}
+	defer publisher.Close()
 	// service
-	updater, err := core.NewService(log, storage, xkcd, words, cfg.XKCD.Concurrency)
+	updater, err := core.NewService(log, storage, xkcd, words, cfg.XKCD.Concurrency, publisher)
 	if err != nil {
 		return fmt.Errorf("failed create Update service: %v", err)
 	}

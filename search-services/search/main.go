@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/nats-io/nats.go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	searchpb "yadro.com/course/proto/search"
@@ -54,7 +55,12 @@ func run(cfg config.Config, log *slog.Logger) error {
 		return fmt.Errorf("failed create search service: %v", err)
 	}
 
-	initiator, err := initiator.NewInitiator(log, searcher, cfg.IndexTTL)
+	nc, err := nats.Connect(cfg.BrokerAddress)
+	if err != nil {
+		return fmt.Errorf("nats connection problem: %v", err)
+	}
+
+	initiator, err := initiator.NewInitiator(log, searcher, cfg.IndexTTL, nc)
 	if err != nil {
 		return fmt.Errorf("failed create initiator: %v", err)
 	}

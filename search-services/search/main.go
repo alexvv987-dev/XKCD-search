@@ -9,27 +9,25 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/nats-io/nats.go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-	updatepb "yadro.com/course/proto/update"
-	"yadro.com/course/update/adapters/broker"
-	"yadro.com/course/update/adapters/db"
-	updategrpc "yadro.com/course/update/adapters/grpc"
-	"yadro.com/course/update/adapters/words"
-	"yadro.com/course/update/adapters/xkcd"
-	"yadro.com/course/update/config"
-	"yadro.com/course/update/core"
+	searchpb "yadro.com/course/proto/search"
+	"yadro.com/course/search/adapters/db"
+	searchgrpc "yadro.com/course/search/adapters/grpc"
+	"yadro.com/course/search/adapters/initiator"
+	"yadro.com/course/search/adapters/words"
+	"yadro.com/course/search/config"
+	"yadro.com/course/search/core"
 )
 
 func main() {
 
-	// config
 	var configPath string
 	flag.StringVar(&configPath, "config", "config.yaml", "server configuration file")
 	flag.Parse()
 	cfg := config.MustLoad(configPath)
 
-	// logger
 	log := mustMakeLogger(cfg.LogLevel)
 
 	if err := run(cfg, log); err != nil {
@@ -42,51 +40,44 @@ func run(cfg config.Config, log *slog.Logger) error {
 	log.Info("starting server")
 	log.Debug("debug messages are enabled")
 
-	// database adapter
 	storage, err := db.New(log, cfg.DBAddress)
 	if err != nil {
 		return fmt.Errorf("failed to connect to db: %v", err)
 	}
-	if err := storage.Migrate(); err != nil {
-		return fmt.Errorf("failed to migrate db: %v", err)
-	}
 
-	// xkcd adapter
-	xkcd, err := xkcd.NewClient(cfg.XKCD.URL, cfg.XKCD.Timeout, log)
-	if err != nil {
-		return fmt.Errorf("failed create XKCD client: %v", err)
-	}
-
-	// words adapter
 	words, err := words.NewClient(cfg.WordsAddress, log)
 	if err != nil {
 		return fmt.Errorf("failed create Words client: %v", err)
 	}
 
-	publisher, err := broker.NewPublisher(log, cfg.BrokerAddress)
+	searcher, err := core.NewService(log, storage, words, cfg.Concurrency)
 	if err != nil {
-		return fmt.Errorf("failed create publisher: %v", err)
-	}
-	defer publisher.Close()
-	// service
-	updater, err := core.NewService(log, storage, xkcd, words, cfg.XKCD.Concurrency, publisher)
-	if err != nil {
-		return fmt.Errorf("failed create Update service: %v", err)
+		return fmt.Errorf("failed create search service: %v", err)
 	}
 
-	// grpc server
+	nc, err := nats.Connect(cfg.BrokerAddress)
+	if err != nil {
+		return fmt.Errorf("nats connection problem: %v", err)
+	}
+
+	initiator, err := initiator.NewInitiator(log, searcher, cfg.IndexTTL, nc)
+	if err != nil {
+		return fmt.Errorf("failed create initiator: %v", err)
+	}
+
 	listener, err := net.Listen("tcp", cfg.Address)
 	if err != nil {
 		return fmt.Errorf("failed to listen: %v", err)
 	}
 
 	s := grpc.NewServer()
-	updatepb.RegisterUpdateServer(s, updategrpc.NewServer(updater))
+	searchpb.RegisterSearchServer(s, searchgrpc.NewServer(searcher))
 	reflection.Register(s)
 
-	// context for Ctrl-C
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+
+	go initiator.Start(ctx)
 
 	go func() {
 		<-ctx.Done()

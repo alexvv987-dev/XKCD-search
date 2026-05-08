@@ -1,11 +1,13 @@
 package aaa
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"yadro.com/course/api/core"
 )
 
 const secretKey = "something secret here" // token sign key
@@ -38,9 +40,41 @@ func New(tokenTTL time.Duration, log *slog.Logger) (AAA, error) {
 }
 
 func (a AAA) Login(name, password string) (string, error) {
-	return "", errors.New("implement me")
+	value, ok := a.users[name]
+	if !ok || value != password {
+		a.log.Warn("failed login attempt", "name", name)
+		return "", core.ErrUnauthorized
+	}
+	claims := jwt.RegisteredClaims{
+		Subject:   adminRole,
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(a.tokenTTL)),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte(secretKey))
+	if err != nil {
+		a.log.Error("could not sign jwt token", "error", err)
+		return "", err
+	}
+	a.log.Info("user logged in", "name", name)
+	return tokenString, nil
 }
 
 func (a AAA) Verify(tokenString string) error {
-	return errors.New("implement me")
+	claims := &jwt.RegisteredClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(secretKey), nil
+	})
+	if err != nil {
+		return fmt.Errorf("could not parse jwt token: %w", err)
+	}
+	if !token.Valid {
+		return core.ErrInvalidToken
+	}
+	if claims.Subject != adminRole {
+		return core.ErrUnauthorized
+	}
+	return nil
 }

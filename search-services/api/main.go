@@ -10,9 +10,14 @@ import (
 	"os"
 	"os/signal"
 
+	authAdapter "yadro.com/course/api/adapters/aaa"
 	"yadro.com/course/api/adapters/rest"
+	"yadro.com/course/api/adapters/rest/middleware"
+	"yadro.com/course/api/adapters/search"
 	"yadro.com/course/api/adapters/update"
+	"yadro.com/course/api/adapters/words"
 	"yadro.com/course/api/config"
+	"yadro.com/course/api/core"
 )
 
 func main() {
@@ -27,18 +32,41 @@ func main() {
 	log.Info("starting server")
 	log.Debug("debug messages are enabled")
 
+	auth, err := authAdapter.New(cfg.TokenTTL, log)
+	if err != nil {
+		log.Error("cannot init aaa", "error", err)
+		os.Exit(1)
+	}
 	updateClient, err := update.NewClient(cfg.UpdateAddress, log)
 	if err != nil {
 		log.Error("cannot init update adapter", "error", err)
 		os.Exit(1)
 	}
-
+	wordsClient, err := words.NewClient(cfg.WordsAddress, log)
+	if err != nil {
+		log.Error("cannot init words adapter", "error", err)
+		os.Exit(1)
+	}
+	searchClient, err := search.NewClient(cfg.SearchAddress, log)
+	if err != nil {
+		log.Error("cannot init search adapter", "error", err)
+		os.Exit(1)
+	}
 	mux := http.NewServeMux()
-
-	mux.Handle("POST /api/db/update", rest.NewUpdateHandler(log, updateClient))
+	pingers := map[string]core.Pinger{
+		"update": updateClient,
+		"words":  wordsClient,
+		"search": searchClient,
+	}
+	mux.Handle("POST /api/login", rest.NewLoginHandler(log, auth))
+	mux.Handle("GET /metrics", rest.NewMetricsHandler())
+	mux.Handle("GET /api/ping", rest.NewPingHandler(log, pingers))
+	mux.Handle("GET /api/search", middleware.Concurrency(rest.NewSearchHandler(log, searchClient), cfg.SearchConcurrency))
+	mux.Handle("GET /api/isearch", middleware.Rate(rest.NewSearchIndexHandler(log, searchClient), cfg.SearchRate))
+	mux.Handle("POST /api/db/update", middleware.Auth(rest.NewUpdateHandler(log, updateClient), auth))
 	mux.Handle("GET /api/db/stats", rest.NewUpdateStatsHandler(log, updateClient))
 	mux.Handle("GET /api/db/status", rest.NewUpdateStatusHandler(log, updateClient))
-	mux.Handle("DELETE /api/db", rest.NewDropHandler(log, updateClient))
+	mux.Handle("DELETE /api/db", middleware.Auth(rest.NewDropHandler(log, updateClient), auth))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
@@ -46,7 +74,7 @@ func main() {
 	server := http.Server{
 		Addr:        cfg.HTTPConfig.Address,
 		ReadTimeout: cfg.HTTPConfig.Timeout,
-		Handler:     mux,
+		Handler:     middleware.WithMetrics(mux),
 		BaseContext: func(_ net.Listener) context.Context { return ctx },
 	}
 

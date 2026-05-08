@@ -17,10 +17,11 @@ type Service struct {
 	concurrency int
 	running     atomic.Bool
 	notFound    atomic.Int64
+	publisher   Publisher
 }
 
 func NewService(
-	log *slog.Logger, db DB, xkcd XKCD, words Words, concurrency int,
+	log *slog.Logger, db DB, xkcd XKCD, words Words, concurrency int, publisher Publisher,
 ) (*Service, error) {
 	if concurrency < 1 {
 		return nil, fmt.Errorf("wrong concurrency specified: %d", concurrency)
@@ -31,6 +32,7 @@ func NewService(
 		xkcd:        xkcd,
 		words:       words,
 		concurrency: concurrency,
+		publisher:   publisher,
 	}, nil
 }
 
@@ -62,6 +64,7 @@ func (s *Service) Update(ctx context.Context) (err error) {
 			}
 		}
 	}()
+	var added atomic.Int64
 	wg := sync.WaitGroup{}
 	s.notFound.Store(0)
 	for i := 0; i < s.concurrency; i++ {
@@ -86,10 +89,17 @@ func (s *Service) Update(ctx context.Context) (err error) {
 					s.log.Error("add comics", "id", id, "err", err)
 					continue
 				}
+				added.Add(1)
 			}
 		})
 	}
 	wg.Wait()
+	if added.Load() > 0 {
+		if err = s.publisher.Publish(ctx); err != nil {
+			s.log.Error("publish comics", "err", err)
+			return err
+		}
+	}
 	return nil
 }
 
@@ -118,9 +128,12 @@ func (s *Service) Status(ctx context.Context) ServiceStatus {
 }
 
 func (s *Service) Drop(ctx context.Context) error {
-	err := s.db.Drop(ctx)
-	if err != nil {
+	if err := s.db.Drop(ctx); err != nil {
 		s.log.Error("error dropping database", "err", err)
+		return err
+	}
+	if err := s.publisher.PublishDrop(ctx); err != nil {
+		s.log.Error("publish comics", "err", err)
 		return err
 	}
 	s.log.Info("dropped")

@@ -54,6 +54,13 @@ func (s *Service) Index(ctx context.Context) error {
 	return nil
 }
 
+func (s *Service) ResetIndex(ctx context.Context) error {
+	s.mu.Lock()
+	s.index = make(map[string][]int)
+	s.mu.Unlock()
+	return nil
+}
+
 func (s *Service) SearchIndex(ctx context.Context, query string, limit int) ([]Comics, error) {
 	words, err := s.words.Norm(ctx, query)
 	if err != nil {

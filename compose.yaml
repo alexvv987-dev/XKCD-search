@@ -80,7 +80,8 @@ services:
     - SEARCH_LIMIT=10
     - DB_ADDRESS=postgres://postgres:password@postgres:5432/postgres
     - WORDS_ADDRESS=words:8080
-    - INDEX_TTL=20s
+    - INDEX_TTL=24h
+    - BROKER_ADDRESS=nats://nats:4222
     depends_on:
       postgres:
         condition: service_healthy

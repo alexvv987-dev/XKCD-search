@@ -21,4 +21,5 @@ type Words interface {
 
 type Indexer interface {
 	Index(ctx context.Context) error
+	ResetIndex(ctx context.Context) error
 }

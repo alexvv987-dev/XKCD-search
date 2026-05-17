@@ -1,0 +1,374 @@
+{{define "admin.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XKCD — Admin</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        :root {
+            --px-bg: #0a0a1a;
+            --px-surface: #12122a;
+            --px-border: #4a4aff;
+            --px-accent: #00ffcc;
+            --px-yellow: #ffee00;
+            --px-red: #ff4466;
+            --px-green: #44ff88;
+            --px-text: #e0e0ff;
+            --px-muted: #8888aa;
+            --px-card: #1a1a3a;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--px-bg);
+            color: var(--px-text);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            line-height: 1.8;
+            min-height: 100vh;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                    linear-gradient(rgba(74,74,255,0.05) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(74,74,255,0.05) 1px, transparent 1px);
+            background-size: 16px 16px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 32px 16px;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 40px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--px-border);
+        }
+
+        .topbar h1 {
+            font-size: 14px;
+            color: var(--px-red);
+            text-shadow: 2px 2px 0 #660022;
+        }
+
+        .topbar-nav { display: flex; gap: 12px; }
+
+        .topbar-nav a {
+            color: var(--px-muted);
+            text-decoration: none;
+            font-size: 8px;
+            border: 1px solid var(--px-muted);
+            padding: 6px 10px;
+        }
+
+        .topbar-nav a:hover {
+            color: var(--px-accent);
+            border-color: var(--px-accent);
+        }
+
+        .flash-msg {
+            background: rgba(68,255,136,0.12);
+            border: 2px solid var(--px-green);
+            color: var(--px-green);
+            font-size: 8px;
+            padding: 12px 14px;
+            margin-bottom: 24px;
+            line-height: 1.8;
+        }
+
+        .flash-msg::before { content: '> '; }
+
+        .status-panel {
+            background: var(--px-card);
+            border: 3px solid var(--px-border);
+            box-shadow: 5px 5px 0 var(--px-border);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .status-label {
+            font-size: 8px;
+            color: var(--px-muted);
+            margin-bottom: 12px;
+        }
+
+        .status-label::before { content: '// '; }
+
+        .status-value {
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            display: inline-block;
+            animation: blink 1.2s step-end infinite;
+        }
+
+        .status-idle .status-dot { background: var(--px-accent); }
+        .status-idle .status-text { color: var(--px-accent); }
+
+        .status-running .status-dot { background: var(--px-yellow); }
+        .status-running .status-text { color: var(--px-yellow); }
+
+        @keyframes blink { 50% { opacity: 0.2; } }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: var(--px-card);
+            border: 2px solid var(--px-border);
+            padding: 16px;
+        }
+
+        .stat-label {
+            font-size: 7px;
+            color: var(--px-muted);
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .stat-value {
+            font-size: 12px;
+            color: var(--px-accent);
+        }
+
+        .actions-title {
+            font-size: 9px;
+            color: var(--px-muted);
+            margin-bottom: 16px;
+        }
+
+        .actions-title::before { content: '// '; }
+
+        .actions-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .action-card {
+            background: var(--px-card);
+            border: 2px solid var(--px-border);
+            padding: 20px;
+        }
+
+        .action-card h3 {
+            font-size: 9px;
+            color: var(--px-text);
+            margin-bottom: 8px;
+        }
+
+        .action-card p {
+            font-size: 7px;
+            color: var(--px-muted);
+            margin-bottom: 16px;
+            line-height: 2;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            padding: 12px;
+            cursor: pointer;
+            border: 2px solid;
+            transition: transform 0.05s, box-shadow 0.05s;
+            text-align: center;
+        }
+
+        .btn:active {
+            transform: translate(3px, 3px);
+            box-shadow: none !important;
+        }
+
+        .btn-update {
+            background: rgba(74,74,255,0.2);
+            border-color: var(--px-border);
+            color: var(--px-accent);
+            box-shadow: 3px 3px 0 var(--px-border);
+        }
+
+        .btn-update:hover {
+            background: var(--px-border);
+            color: #fff;
+        }
+
+        .btn-drop {
+            background: rgba(255,68,102,0.15);
+            border-color: var(--px-red);
+            color: var(--px-red);
+            box-shadow: 3px 3px 0 #660022;
+        }
+
+        .btn-drop:hover {
+            background: var(--px-red);
+            color: #fff;
+        }
+
+        .log-section {
+            background: #000011;
+            border: 2px solid rgba(74,74,255,0.4);
+            padding: 16px;
+        }
+
+        .log-header {
+            font-size: 8px;
+            color: var(--px-muted);
+            margin-bottom: 12px;
+            border-bottom: 1px solid rgba(74,74,255,0.2);
+            padding-bottom: 8px;
+        }
+
+        .log-line {
+            font-size: 8px;
+            color: var(--px-muted);
+            line-height: 2.2;
+        }
+
+        .log-line .ts { color: #333355; }
+        .log-line .ok { color: var(--px-green); }
+        .log-line .warn { color: var(--px-yellow); }
+
+        .scanlines {
+            pointer-events: none;
+            position: fixed;
+            inset: 0;
+            z-index: 999;
+            background: repeating-linear-gradient(
+                    0deg, transparent, transparent 2px,
+                    rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
+            );
+        }
+    </style>
+</head>
+<body>
+<div class="scanlines"></div>
+<div class="container">
+
+    <div class="topbar">
+        <h1>[ ADMIN PANEL ]</h1>
+        <nav class="topbar-nav">
+            <a href="/">← SEARCH</a>
+        </nav>
+    </div>
+
+    {{if .Message}}
+    <div class="flash-msg">{{.Message}}</div>
+    {{end}}
+
+    <div id="status-panel" class="status-panel {{if eq .Status "running"}}status-running{{else}}status-idle{{end}}">
+        <p class="status-label">DATABASE STATUS</p>
+        <div class="status-value">
+            <span class="status-dot"></span>
+            <span id="status-text" class="status-text">{{if .Status}}{{.Status}}{{else}}unknown{{end}}</span>
+        </div>
+    </div>
+
+    <p class="actions-title">DATABASE STATS</p>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <span class="stat-label">COMICS FETCHED</span>
+            <span id="stat-fetched" class="stat-value">{{.ComicsFetched}}</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">COMICS TOTAL</span>
+            <span id="stat-total" class="stat-value">{{.ComicsTotal}}</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">WORDS TOTAL</span>
+            <span id="stat-words" class="stat-value">{{.WordsTotal}}</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">WORDS UNIQUE</span>
+            <span id="stat-unique" class="stat-value">{{.WordsUnique}}</span>
+        </div>
+    </div>
+
+
+    <p class="actions-title">OPERATIONS</p>
+    <div class="actions-grid">
+        <div class="action-card">
+            <h3>UPDATE DATABASE</h3>
+            <p>FETCH NEW COMICS<br>FROM XKCD API</p>
+            <form method="POST" action="/admin/update">
+                <button type="submit" class="btn btn-update">[ RUN UPDATE ]</button>
+            </form>
+        </div>
+
+        <div class="action-card">
+            <h3>DROP DATABASE</h3>
+            <p>DELETE ALL STORED<br>COMICS DATA</p>
+            <form method="POST" action="/admin/drop">
+                <button type="submit" class="btn btn-drop">[ DROP ALL ]</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="log-section" aria-hidden="true">
+        <p class="log-header">// system log</p>
+        <p class="log-line"><span class="ts">[sys]</span> xkcd-search daemon <span class="ok">running</span></p>
+        <p class="log-line"><span class="ts">[sys]</span> admin session <span class="ok">authenticated</span></p>
+        <p class="log-line"><span class="ts">[db]</span> status: <span id="log-status" class="{{if eq .Status "running"}}warn{{else}}ok{{end}}">{{if .Status}}{{.Status}}{{else}}unknown{{end}}</span></p>
+    </div>
+
+</div>
+<script>
+async function refreshAdmin() {
+    try {
+        const [st, stats] = await Promise.all([
+            fetch('/admin/api/status').then(r => r.ok ? r.json() : null),
+            fetch('/admin/api/stats').then(r => r.ok ? r.json() : null),
+        ]);
+        if (st && st.status) {
+            const panel = document.getElementById('status-panel');
+            const text = document.getElementById('status-text');
+            const logStatus = document.getElementById('log-status');
+            text.textContent = st.status;
+            logStatus.textContent = st.status;
+            panel.classList.toggle('status-running', st.status === 'running');
+            panel.classList.toggle('status-idle', st.status !== 'running');
+            logStatus.classList.toggle('warn', st.status === 'running');
+            logStatus.classList.toggle('ok', st.status !== 'running');
+        }
+        if (stats) {
+            document.getElementById('stat-fetched').textContent = stats.comics_fetched;
+            document.getElementById('stat-total').textContent = stats.comics_total;
+            document.getElementById('stat-words').textContent = stats.words_total;
+            document.getElementById('stat-unique').textContent = stats.words_unique;
+        }
+    } catch (e) {
+        console.error('refresh failed', e);
+    }
+}
+setInterval(refreshAdmin, 3000);
+</script>
+</body>
+</html>
+{{end}}

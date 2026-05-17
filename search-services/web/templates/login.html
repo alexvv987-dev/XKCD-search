@@ -1,0 +1,230 @@
+
+{{define "login.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XKCD — Login</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        :root {
+            --px-bg: #0a0a1a;
+            --px-surface: #12122a;
+            --px-border: #4a4aff;
+            --px-accent: #00ffcc;
+            --px-yellow: #ffee00;
+            --px-red: #ff4466;
+            --px-text: #e0e0ff;
+            --px-muted: #8888aa;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--px-bg);
+            color: var(--px-text);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            image-rendering: pixelated;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                    linear-gradient(rgba(74,74,255,0.05) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(74,74,255,0.05) 1px, transparent 1px);
+            background-size: 16px 16px;
+            pointer-events: none;
+        }
+
+        .login-wrap {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 400px;
+            padding: 16px;
+        }
+
+        .login-box {
+            background: var(--px-surface);
+            border: 3px solid var(--px-border);
+            box-shadow: 6px 6px 0 var(--px-border);
+            padding: 32px;
+        }
+
+        .login-title {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .login-title h1 {
+            font-size: 14px;
+            color: var(--px-accent);
+            text-shadow: 2px 2px 0 #004433;
+            margin-bottom: 8px;
+        }
+
+        .login-title p {
+            font-size: 7px;
+            color: var(--px-muted);
+        }
+
+        .avatar {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 20px;
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 1px;
+        }
+
+        .avatar .px { width: 100%; aspect-ratio: 1; }
+        .avatar .px.on { background: var(--px-accent); }
+        .avatar .px.off { background: transparent; }
+        .avatar .px.y { background: var(--px-yellow); }
+
+        .error-msg {
+            background: rgba(255,68,102,0.15);
+            border: 2px solid var(--px-red);
+            color: var(--px-red);
+            font-size: 8px;
+            padding: 10px 12px;
+            margin-bottom: 20px;
+            line-height: 1.8;
+        }
+
+        .error-msg::before { content: '! '; }
+
+        .field {
+            margin-bottom: 20px;
+        }
+
+        .field label {
+            display: block;
+            font-size: 8px;
+            color: var(--px-muted);
+            margin-bottom: 8px;
+        }
+
+        .field label::before { content: '> '; color: var(--px-border); }
+
+        .field input {
+            width: 100%;
+            background: #000011;
+            border: 2px solid var(--px-border);
+            color: var(--px-accent);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 9px;
+            padding: 12px;
+            outline: none;
+            caret-color: var(--px-accent);
+        }
+
+        .field input:focus {
+            border-color: var(--px-accent);
+        }
+
+        .field input::placeholder {
+            color: #333355;
+        }
+
+        .btn-login {
+            width: 100%;
+            background: var(--px-border);
+            border: 2px solid var(--px-border);
+            box-shadow: 4px 4px 0 #1a1aaa;
+            color: #fff;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            padding: 14px;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: transform 0.05s, box-shadow 0.05s;
+            letter-spacing: 1px;
+        }
+
+        .btn-login:hover {
+            background: var(--px-accent);
+            border-color: var(--px-accent);
+            color: #000;
+            box-shadow: 4px 4px 0 #004433;
+        }
+
+        .btn-login:active {
+            transform: translate(4px, 4px);
+            box-shadow: none;
+        }
+
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: var(--px-muted);
+            text-decoration: none;
+            font-size: 8px;
+        }
+
+        .back-link:hover { color: var(--px-accent); }
+
+        .scanlines {
+            pointer-events: none;
+            position: fixed;
+            inset: 0;
+            z-index: 999;
+            background: repeating-linear-gradient(
+                    0deg, transparent, transparent 2px,
+                    rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
+            );
+        }
+    </style>
+</head>
+<body>
+<div class="scanlines"></div>
+<div class="login-wrap">
+    <div class="login-box">
+        <div class="login-title">
+            <!-- pixel face -->
+            <div class="avatar" aria-hidden="true">
+                <div class="px off"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px off"></div>
+                <div class="px on"></div><div class="px on"></div><div class="px off"></div><div class="px on"></div><div class="px on"></div><div class="px off"></div><div class="px on"></div><div class="px on"></div>
+                <div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div>
+                <div class="px on"></div><div class="px y"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px y"></div><div class="px on"></div>
+                <div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div>
+                <div class="px on"></div><div class="px off"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px off"></div><div class="px on"></div>
+                <div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px off"></div><div class="px off"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div>
+                <div class="px off"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px on"></div><div class="px off"></div>
+            </div>
+            <h1>ADMIN LOGIN</h1>
+            <p>// restricted area</p>
+        </div>
+
+        {{if .Error}}
+        <div class="error-msg">{{.Error}}</div>
+        {{end}}
+
+        <form method="POST" action="/login">
+            <div class="field">
+                <label for="name">USERNAME</label>
+                <input type="text" id="name" name="name" placeholder="enter username..." autocomplete="username">
+            </div>
+            <div class="field">
+                <label for="password">PASSWORD</label>
+                <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn-login">[ ACCESS ]</button>
+        </form>
+
+        <a href="/" class="back-link">← back to search</a>
+    </div>
+</div>
+</body>
+</html>
+{{end}}

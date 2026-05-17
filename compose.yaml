@@ -14,7 +14,7 @@ services:
     environment:
       - ADMIN_USER=admin
       - ADMIN_PASSWORD=password
-      - TOKEN_TTL=2m
+      - TOKEN_TTL=24h
       - API_ADDRESS=:8080
       - WORDS_ADDRESS=words:8080
       - UPDATE_ADDRESS=update:8080
@@ -63,6 +63,8 @@ services:
         condition: service_healthy
       words:
         condition: service_started
+      nats:
+        condition: service_started
 
   search:
     image: search:latest
@@ -89,6 +91,24 @@ services:
         condition: service_started
       nats:
         condition: service_started
+
+  web:
+    image: web:latest
+    build:
+      context: search-services
+      dockerfile: Dockerfile.web
+    container_name: web
+    restart: unless-stopped
+    ports:
+      - 28084:8080
+    volumes:
+      - ./search-services/web/config.yaml:/config.yaml
+    environment:
+      - WEB_ADDRESS=:8080
+      - API_ADDRESS=http://api:8080
+      - WEB_TIMEOUT=30m
+    depends_on:
+      - api
 
   tests:
     image: tests:latest

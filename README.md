@@ -1,25 +1,31 @@
-# Тестирование
+# Web-интерфейс к поисковому сервису
 
 ## Цель
 
-Покрыть код модульными тестами.
+Разработать frontend микросервиc (генератор HTML страниц), с которым пользователь сможет
+взаимодействовать через веб-браузер. Альтернативно можно попробовать реализовать Telegram-бота.
 
-Тесты должны запускаться через make unit и проходить. Каждый файл должен быть покрыт как
-минимум на 50%. Не покрываются тестами автосгенерированные файлы. Файл покрытия тестами
-cover.html должен быть закоммичен в текущее решение.
+Новый микросервис должен позволить клиентам искать картинки комиксов по введенной фразе.
+В качестве дополнительной возможности предлагается реализовать страницу администрирования
+сервиса (update/drop/stats/status APIs) c авторизацией пользователя.
+
+Результатом должен стать небольшой видеоролик, в котором представлено взаимодействие
+пользователя с поисковым кластером с помощью веб-браузера или Telegram-клиента.
 
 Сервисы должны собираться и запускаться через модифицированный compose файл,
 а также проходить интеграционные тесты - запуск специального тест контейнера.
 
 ## Критерии приемки
 
-1. make unit запускает модульные тесты и собирает статистику.
-2. Код покрыт тестами на 50%.
+1. Все модульные и интеграционные тесты проходят.
+2. Видео-ролик на 1-2 минуты снят и внедрен в ABOUT.md файл.
 
 ## Материалы для ознакомления
 
-- [Hello world test](https://go.dev/doc/tutorial/add-a-test)
-- [Comprehensive Guide to Testing in Go](https://blog.jetbrains.com/go/2022/11/22/comprehensive-guide-to-testing-in-go/)
-- [Unit-Тестирование в Golang](https://www.youtube.com/watch?v=fMUNBJPhP6Y)
-- [Unit-Тестирование Веб-Приложений в Golang](http://youtube.com/watch?v=Mvw5fbHGJFw)
-- [Unit-Тестирование Работы с БД в Golang](http://youtube.com/watch?v=QJq3PZ1V-5Y)
+Html templates & cookies
+
+- [Go Web Examples. Templates](https://gowebexamples.com/templates/)
+- [Определение и использование шаблонов](https://metanit.com/go/web/2.1.php)
+- [Implementing JWT Authentication In Go](https://permify.co/post/jwt-authentication-go/)
+- [A complete guide to working with Cookies in Go](https://www.alexedwards.net/blog/working-with-cookies-in-go)
+- [Как перенаправить на URL-адрес в Golang](https://dzen.ru/a/Y_k9jjh22TtvSxYR)

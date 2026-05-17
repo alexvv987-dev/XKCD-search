@@ -52,9 +52,14 @@ func (s *Server) Status(ctx context.Context, _ *emptypb.Empty) (*updatepb.Status
 }
 
 func (s *Server) Update(ctx context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
-	if err := s.service.Update(ctx); err != nil {
-		return nil, toGRPCError(err)
+	if s.service.Status(ctx) == core.StatusRunning {
+		return nil, toGRPCError(core.ErrAlreadyExists)
 	}
+	go func() {
+		if err := s.service.Update(context.Background()); err != nil {
+			return
+		}
+	}()
 	return &emptypb.Empty{}, nil
 }
 

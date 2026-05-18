@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const waitUpdateIdle = 15 * time.Minute
+
 type UpdateStats struct {
 	WordsTotal    int `json:"words_total"`
 	WordsUnique   int `json:"words_unique"`
@@ -59,6 +61,7 @@ func TestUpdate(t *testing.T) {
 		"wrong statuses from concurrent updates, expect ok && accepted",
 	)
 	require.Equal(t, "running", res3, "need running status while update")
+	waitForIdle(t)
 	st := stats(t)
 	require.Equal(t, st.ComicsTotal, st.ComicsFetched)
 	require.True(t, st.ComicsTotal > 3000, "there are more than 3000 comics in XKCD")
@@ -81,6 +84,14 @@ func login(t *testing.T) string {
 	return string(token)
 }
 
+func waitForIdle(t *testing.T) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		st, err := status()
+		return err == nil && st == "idle"
+	}, waitUpdateIdle, time.Second, "update did not reach idle")
+}
+
 func prepare(t *testing.T) {
 	req, err := http.NewRequest(http.MethodDelete, address+"/api/db", nil)
 	require.NoError(t, err, "cannot make request")
@@ -91,16 +102,14 @@ func prepare(t *testing.T) {
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
+	waitForIdle(t)
 	updateStats := stats(t)
 	require.Equal(t, 0, updateStats.ComicsFetched)
 	require.True(t, updateStats.ComicsTotal > 3000, "there are more than 3000 comics in XKCD")
 	require.Equal(t, 0, updateStats.WordsTotal)
 	require.Equal(t, 0, updateStats.WordsUnique)
-	updateStatus, err := status()
-	require.Equal(t, "idle", updateStatus, err)
 }
 
-// this must not contain t because it runs in a waited goroutine
 func update(token string) (int, error) {
 	req, err := http.NewRequest(http.MethodPost, address+"/api/db/update", nil)
 	if err != nil {
@@ -115,7 +124,6 @@ func update(token string) (int, error) {
 	return resp.StatusCode, nil
 }
 
-// this must not contain t because it runs in a waited goroutine
 func status() (string, error) {
 	resp, err := client.Get(address + "/api/db/status")
 	if err != nil {

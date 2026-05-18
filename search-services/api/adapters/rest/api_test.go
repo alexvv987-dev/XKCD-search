@@ -263,7 +263,7 @@ func TestApi_UpdateHandler(t *testing.T) {
 		{
 			name:       "ok",
 			updaterErr: nil,
-			wantStatus: http.StatusAccepted,
+			wantStatus: http.StatusOK,
 		},
 	}
 	for _, tt := range tests {

@@ -237,7 +237,7 @@ func NewUpdateHandler(log *slog.Logger, updater core.Updater) http.HandlerFunc {
 			w.WriteHeader(toHTTPStatus(err))
 			return
 		}
-		w.WriteHeader(http.StatusAccepted)
+		w.WriteHeader(http.StatusOK)
 	}
 }
 

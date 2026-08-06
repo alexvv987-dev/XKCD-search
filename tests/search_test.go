@@ -24,6 +24,7 @@ func TestSearch(t *testing.T) {
 	token := login(t)
 	_, err := update(token)
 	require.NoError(t, err, "could not run update")
+	waitForIdle(t)
 	t.Run("no phrase", SearchNoPhrase)
 	t.Run("bad limit minus", SearchBadLimitMinus)
 	t.Run("bad limit alpha", SearchBadLimitAlpha)
@@ -122,7 +123,6 @@ func SearchPhrases(t *testing.T) {
 }
 
 func IndexSearchPhrases(t *testing.T) {
-	// clean DB and wait 30 sec for index update
 	prepare(t)
 	time.Sleep(30 * time.Second)
 	resp, err := client.Get(address + "/api/isearch?phrase=linux")
@@ -134,10 +134,10 @@ func IndexSearchPhrases(t *testing.T) {
 	require.Equal(t, 0, comics.Total)
 	require.Equal(t, 0, len(comics.Comics))
 
-	// update DB and wait 30 sec for index update
 	token := login(t)
 	_, err = update(token)
 	require.NoError(t, err, "could not run update")
+	waitForIdle(t)
 	time.Sleep(30 * time.Second)
 
 	testCases := []struct {

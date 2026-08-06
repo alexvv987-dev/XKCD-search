@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type Service struct {
@@ -127,7 +128,24 @@ func (s *Service) Status(ctx context.Context) ServiceStatus {
 	return StatusIdle
 }
 
+func (s *Service) waitIdle(ctx context.Context) error {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for s.running.Load() {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+	return nil
+}
+
 func (s *Service) Drop(ctx context.Context) error {
+	if err := s.waitIdle(ctx); err != nil {
+		s.log.Error("error waiting for update to finish", "err", err)
+		return err
+	}
 	if err := s.db.Drop(ctx); err != nil {
 		s.log.Error("error dropping database", "err", err)
 		return err

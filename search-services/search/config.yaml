@@ -1,4 +1,4 @@
 log_level: DEBUG
-search_address: localhost:83
-db_address: localhost:82
-words_address: localhost:81
+search_address: :83
+db_address: postgres:82
+words_address: words:81

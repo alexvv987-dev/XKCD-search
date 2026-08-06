@@ -1,0 +1,514 @@
+
+{{define "search.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XKCD Search</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        :root {
+            --px-bg: #0a0a1a;
+            --px-surface: #12122a;
+            --px-border: #4a4aff;
+            --px-accent: #00ffcc;
+            --px-yellow: #ffee00;
+            --px-red: #ff4466;
+            --px-text: #e0e0ff;
+            --px-muted: #8888aa;
+            --px-card: #1a1a3a;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--px-bg);
+            color: var(--px-text);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            line-height: 1.8;
+            min-height: 100vh;
+            image-rendering: pixelated;
+        }
+
+        /* Pixel grid background */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                    linear-gradient(rgba(74,74,255,0.05) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(74,74,255,0.05) 1px, transparent 1px);
+            background-size: 16px 16px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 32px 16px;
+        }
+
+        /* Pixel border mixin */
+        .px-box {
+            border: 3px solid var(--px-border);
+            box-shadow: 4px 4px 0 var(--px-border);
+            background: var(--px-surface);
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            color: var(--px-accent);
+            text-shadow: 3px 3px 0 #004433, -1px -1px 0 #004433;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+        }
+
+        .header .subtitle {
+            color: var(--px-muted);
+            font-size: 8px;
+        }
+
+        /* Blink animation for cursor */
+        .blink {
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* Search form */
+        .search-form {
+            padding: 24px;
+            margin-bottom: 32px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: stretch;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            min-width: 200px;
+            position: relative;
+        }
+
+        .input-wrapper::before {
+            content: '>';
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--px-accent);
+            font-size: 10px;
+            pointer-events: none;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            background: #000011;
+            border: 2px solid var(--px-border);
+            color: var(--px-accent);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 9px;
+            padding: 12px 12px 12px 28px;
+            outline: none;
+            caret-color: var(--px-accent);
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--px-accent);
+            box-shadow: 0 0 0 2px rgba(0,255,204,0.2);
+        }
+
+        .limit-wrapper {
+            min-width: 100px;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            background: #000011;
+            border: 2px solid var(--px-border);
+            color: var(--px-yellow);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 9px;
+            padding: 12px 8px;
+            outline: none;
+        }
+
+        input[type="number"]:focus {
+            border-color: var(--px-yellow);
+        }
+
+        select {
+            background: #000011;
+            border: 2px solid var(--px-border);
+            color: var(--px-yellow);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            padding: 12px 8px;
+            outline: none;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            min-width: 130px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23ffee00'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            padding-right: 28px;
+        }
+
+        select:focus { border-color: var(--px-yellow); }
+
+        .btn-search {
+            background: var(--px-border);
+            border: 2px solid var(--px-border);
+            box-shadow: 3px 3px 0 #1a1aaa;
+            color: #fff;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 9px;
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: transform 0.05s, box-shadow 0.05s;
+            white-space: nowrap;
+        }
+
+        .btn-search:hover {
+            background: var(--px-accent);
+            border-color: var(--px-accent);
+            color: #000;
+            box-shadow: 3px 3px 0 #004433;
+        }
+
+        .btn-search:active {
+            transform: translate(3px, 3px);
+            box-shadow: none;
+        }
+
+        /* Nav */
+        .nav {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 24px;
+            gap: 12px;
+        }
+
+        .nav a {
+            color: var(--px-muted);
+            text-decoration: none;
+            font-size: 8px;
+            border: 1px solid var(--px-muted);
+            padding: 6px 10px;
+        }
+
+        .nav a:hover {
+            color: var(--px-red);
+            border-color: var(--px-red);
+        }
+
+        /* Results header */
+        .results-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--px-border);
+        }
+
+        .results-count {
+            color: var(--px-yellow);
+            font-size: 9px;
+        }
+
+        .results-count span {
+            color: var(--px-accent);
+            font-size: 14px;
+        }
+
+        /* Comics grid */
+        .comics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 16px;
+        }
+
+        .comic-card {
+            background: var(--px-card);
+            border: 2px solid var(--px-border);
+            box-shadow: 3px 3px 0 rgba(74,74,255,0.4);
+            overflow: hidden;
+            transition: transform 0.1s, box-shadow 0.1s;
+            display: block;
+            width: 100%;
+            padding: 0;
+            cursor: pointer;
+            font-family: inherit;
+            text-align: left;
+            color: inherit;
+        }
+
+        .comic-card:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 5px 5px 0 var(--px-accent);
+            border-color: var(--px-accent);
+        }
+
+        .comic-card img {
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+            display: block;
+            image-rendering: pixelated;
+            filter: saturate(0.8) contrast(1.1);
+            pointer-events: none;
+        }
+
+        .comic-id {
+            padding: 8px;
+            font-size: 8px;
+            color: var(--px-muted);
+            border-top: 1px solid rgba(74,74,255,0.3);
+        }
+
+        .comic-id::before { content: '# '; color: var(--px-accent); }
+
+        /* Preview modal */
+        .preview-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .preview-modal[hidden] {
+            display: none;
+        }
+
+        .preview-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 17, 0.88);
+            cursor: pointer;
+        }
+
+        .preview-dialog {
+            position: relative;
+            z-index: 1;
+            max-width: min(90vw, 800px);
+            max-height: 90vh;
+            background: var(--px-surface);
+            border: 3px solid var(--px-border);
+            box-shadow: 8px 8px 0 var(--px-border);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .preview-close {
+            align-self: flex-end;
+            background: transparent;
+            border: 2px solid var(--px-red);
+            color: var(--px-red);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        .preview-close:hover {
+            background: var(--px-red);
+            color: #fff;
+        }
+
+        .preview-dialog img {
+            max-width: 100%;
+            max-height: calc(90vh - 120px);
+            width: auto;
+            height: auto;
+            display: block;
+            image-rendering: pixelated;
+            border: 2px solid var(--px-border);
+        }
+
+        .preview-caption {
+            font-size: 10px;
+            color: var(--px-accent);
+        }
+
+        .preview-external {
+            font-size: 8px;
+            color: var(--px-yellow);
+            text-decoration: none;
+            border: 1px solid var(--px-yellow);
+            padding: 8px 12px;
+        }
+
+        .preview-external:hover {
+            background: var(--px-yellow);
+            color: #000;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--px-muted);
+        }
+
+        .empty-state .pixel-art {
+            font-size: 32px;
+            margin-bottom: 20px;
+            display: block;
+            filter: grayscale(0.3);
+        }
+
+        .empty-state p {
+            font-size: 9px;
+            line-height: 2;
+        }
+
+        /* Scanline effect */
+        .scanlines {
+            pointer-events: none;
+            position: fixed;
+            inset: 0;
+            z-index: 999;
+            background: repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(0,0,0,0.03) 2px,
+                    rgba(0,0,0,0.03) 4px
+            );
+        }
+    </style>
+</head>
+<body>
+<div class="scanlines"></div>
+<div class="container">
+    <div class="nav">
+        <a href="/admin">[ ADMIN ]</a>
+    </div>
+
+    <div class="header">
+        <h1>XKCD<span class="blink">_</span>SEARCH</h1>
+        <p class="subtitle">// a webcomic of romance, sarcasm, math and language</p>
+    </div>
+
+    <form class="px-box search-form" method="GET" action="/">
+        <div class="form-row">
+            <div class="input-wrapper">
+                <input type="text" name="phrase" value="{{.Phrase}}" placeholder="enter search phrase...">
+            </div>
+            <select name="mode">
+                <option value="search" {{if eq .Mode "search"}}selected{{end}}>FULLTEXT</option>
+                <option value="index" {{if eq .Mode "index"}}selected{{end}}>INDEX</option>
+            </select>
+            <div class="limit-wrapper">
+                <input type="number" name="limit" min="1" max="100"
+                       value="{{if .Limit}}{{.Limit}}{{else}}10{{end}}" title="result limit" aria-label="result limit">
+            </div>
+            <button type="submit" class="btn-search">[ SEARCH ]</button>
+        </div>
+    </form>
+
+    {{if .Comics}}
+    <div class="results-header">
+        <p class="results-count">FOUND: <span>{{.Total}}</span> COMICS</p>
+    </div>
+    <div class="comics-grid">
+        {{range .Comics}}
+        <button type="button" class="comic-card"
+                data-preview-src="{{.URL}}"
+                data-preview-id="{{.ID}}"
+                aria-label="Preview comic {{.ID}}">
+            <img src="{{.URL}}" alt="xkcd #{{.ID}}">
+            <div class="comic-id">{{.ID}}</div>
+        </button>
+        {{end}}
+    </div>
+    {{else if .Phrase}}
+    <div class="empty-state">
+        <span class="pixel-art">👾</span>
+        <p>NO RESULTS FOUND<br>FOR "{{.Phrase}}"</p>
+    </div>
+    {{else}}
+    <div class="empty-state">
+        <span class="pixel-art">🕹️</span>
+        <p>ENTER A PHRASE<br>TO START SEARCHING</p>
+    </div>
+    {{end}}
+</div>
+
+<div id="preview-modal" class="preview-modal" hidden>
+    <div class="preview-backdrop" id="preview-backdrop"></div>
+    <div class="preview-dialog" role="dialog" aria-modal="true" aria-labelledby="preview-caption">
+        <button type="button" class="preview-close" id="preview-close" aria-label="Close preview">[ X ]</button>
+        <img id="preview-image" src="" alt="">
+        <p class="preview-caption" id="preview-caption">#<span id="preview-id"></span></p>
+        <a id="preview-external" class="preview-external" href="#" target="_blank" rel="noopener noreferrer">[ OPEN ON XKCD ]</a>
+    </div>
+</div>
+
+<script>
+(function () {
+    const modal = document.getElementById('preview-modal');
+    if (!modal) return;
+
+    const previewImage = document.getElementById('preview-image');
+    const previewId = document.getElementById('preview-id');
+    const previewExternal = document.getElementById('preview-external');
+    const previewClose = document.getElementById('preview-close');
+    const previewBackdrop = document.getElementById('preview-backdrop');
+
+    function openPreview(imageSrc, comicId) {
+        previewImage.src = imageSrc;
+        previewImage.alt = 'xkcd #' + comicId;
+        previewId.textContent = comicId;
+        previewExternal.href = 'https://xkcd.com/' + comicId;
+        modal.hidden = false;
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closePreview() {
+        modal.hidden = true;
+        previewImage.removeAttribute('src');
+        document.body.style.overflow = '';
+    }
+
+    document.querySelectorAll('.comic-card').forEach(function (card) {
+        card.addEventListener('click', function () {
+            openPreview(card.dataset.previewSrc, card.dataset.previewId);
+        });
+    });
+
+    previewClose.addEventListener('click', closePreview);
+    previewBackdrop.addEventListener('click', closePreview);
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && !modal.hidden) {
+            closePreview();
+        }
+    });
+})();
+</script>
+</body>
+</html>
+{{end}}
